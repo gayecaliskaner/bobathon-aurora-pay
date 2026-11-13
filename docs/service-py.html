@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>services/core/service.py – Modül Açıklaması</title>
+<style>
+  body { font-family: -apple-system, Helvetica, Arial, sans-serif; max-width: 860px; margin: 2rem auto; padding: 0 1rem; line-height: 1.55; color: #222; }
+  h1, h2 { border-bottom: 1px solid #ddd; padding-bottom: .25rem; }
+  code, pre { background: #f5f5f5; border-radius: 4px; }
+  code { padding: .1rem .3rem; }
+  pre { padding: .8rem; overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { border: 1px solid #ccc; padding: .4rem .6rem; text-align: left; vertical-align: top; }
+  th { background: #f0f0f0; }
+</style>
+</head>
+<body>
+<h1><code>services/core/service.py</code></h1>
+<p>Aurora Pay çekirdek servisinin <strong>transfer iş mantığı</strong> katmanıdır. HTTP katmanından (API) gelen istekleri alır,
+bellek içi depo (<code>store</code>) üzerinde hesap oluşturma, hesap sorgulama ve para transferi işlemlerini yürütür.</p>
+
+<h2>Bağımlılıklar</h2>
+<table>
+  <tr><th>Modül</th><th>Kullanım amacı</th></tr>
+  <tr><td><code>store</code></td><td>Bellek içi veri: <code>accounts</code>, <code>transfers</code>, <code>idempotency</code> sözlükleri.</td></tr>
+  <tr><td><code>fees</code></td><td><code>fee_for(amount)</code> ile transfer ücreti hesaplar (<code>Decimal</code>, <code>ROUND_HALF_UP</code>, 2 ondalık). Eşik <code>1000.00</code> dahil olmak üzere düşük oran (%0,25) uygulanır; altında %0,5.</td></tr>
+  <tr><td><code>reports</code></td><td><code>record_transfer(...)</code> ile transferi sqlite <code>transfer_log</code> tablosuna yazar.</td></tr>
+  <tr><td><code>errors</code></td><td><code>AccountNotFound</code>, <code>AccountAlreadyExists</code>, <code>InsufficientFunds</code> iş hatalarını tanımlar.</td></tr>
+  <tr><td><code>models</code></td><td><code>AccountCreate</code> ve <code>TransferRequest</code> Pydantic modelleri.</td></tr>
+</table>
+
+<h2>Modül düzeyindeki nesneler</h2>
+<ul>
+  <li><code>logger</code> – <code>logging.getLogger("aurora.core")</code>; <code>print</code> yerine kullanılır.</li>
+  <li><code>_lock</code> – <code>threading.Lock</code>. "Kontrol et, sonra yaz" dizilerini (idempotency sorgusu, çift hesap kontrolü, bakiye kontrolü + borçlandırma) iş parçacıkları arasında atomik yapar.</li>
+</ul>
+
+<h2>Fonksiyonlar</h2>
+
+<h3><code>get_account(account_id: str) -&gt; dict</code></h3>
+<p><code>store.accounts</code> içinden hesabı döner. Yoksa <code>AccountNotFound</code> fırlatır (API tarafında 404 <code>ACCOUNT_NOT_FOUND</code>).
+Kilit almaz; <code>execute_transfer</code> içinde zaten kilit altında çağrılır.</p>
+
+<h3><code>create_account(data: AccountCreate) -&gt; dict</code></h3>
+<ol>
+  <li>Kilidi alır.</li>
+  <li><code>data.id</code> zaten varsa <code>AccountAlreadyExists</code> fırlatır (409 <code>ACCOUNT_ALREADY_EXISTS</code>).</li>
+  <li>Modeli <code>model_dump()</code> ile sözlüğe çevirip <code>store.accounts</code> içine kaydeder ve döner.</li>
+</ol>
+
+<h3><code>execute_transfer(req: TransferRequest, idempotency_key: str | None = None) -&gt; dict</code></h3>
+<p>Ana iş akışı. Tamamı <code>_lock</code> altında çalışır:</p>
+<ol>
+  <li><strong>Idempotency:</strong> anahtar verilmiş ve <code>store.idempotency</code> içinde varsa ilk yanıt aynen döner; yeni işlem yapılmaz.</li>
+  <li><strong>Doğrulama (yazmadan önce):</strong>
+    <ul>
+      <li>Kaynak ve hedef hesabı <code>get_account</code> ile bulur (yoksa <code>AccountNotFound</code>).</li>
+      <li><code>fee = fees.fee_for(req.amount)</code>, <code>total = amount + fee</code>.</li>
+      <li>Kaynak bakiye <code>total</code>'den küçükse <code>InsufficientFunds</code> (409 <code>INSUFFICIENT_FUNDS</code>).</li>
+    </ul>
+  </li>
+  <li><strong>Transfer kaydı oluşturma:</strong> <code>uuid4</code> id, tutar, ücret, para birimi, <code>status="COMPLETED"</code>, UTC <code>created_at</code>.</li>
+  <li><strong>Raporlama:</strong> <code>reports.record_transfer(transfer, src["owner_name"])</code> sqlite günlüğüne yazar.</li>
+  <li><strong>Yazma:</strong> kaynaktan <code>amount + fee</code> düşer, hedefe yalnızca <code>amount</code> eklenir (ücret hedefe geçmez), transfer <code>store.transfers</code> içine, varsa idempotency anahtarı altına kaydedilir.</li>
+  <li><strong>Loglama (kilit dışı):</strong> yalnızca <code>transfer_id</code>, <code>from_account</code>, <code>to_account</code> loglanır; PII yoktur.</li>
+</ol>
+
+<h4>Örnek akış</h4>
+<pre>
+amount = 1000.00  → fee = 2.50  (eşik dahil, %0,25)
+kaynak bakiye  : -1002.50
+hedef bakiye   : +1000.00
+</pre>
+
+<h2>Tasarım notları</h2>
+<ul>
+  <li><strong>Atomiklik:</strong> tüm doğrulamalar yazmadan önce yapılır; hata durumunda bakiyeler değişmez.</li>
+  <li><strong>Eşzamanlılık:</strong> tek global kilit, aynı anahtarla gelen eşzamanlı isteklerin çift transfer üretmesini engeller.</li>
+  <li><strong>Para tipi:</strong> tutarlar <code>Decimal</code>'dir; <code>float</code> kullanılmaz.</li>
+  <li><strong>Hata zarfı:</strong> fırlatılan istisnalar API katmanında <code>{"error": {"code", "message"}}</code> biçimine çevrilir.</li>
+  <li><strong>Dikkat:</strong> <code>reports.record_transfer</code> çağrısı bakiye yazımından önce yapıldığı için, sonraki adımlarda hata oluşursa günlükte kayıt kalabilir.</li>
+</ul>
+</body>
+</html>

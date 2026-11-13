@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>INCIDENT-2041 Kök Neden Analizi (Root Cause Analysis)</title>
+    <style>
+        :root {
+            --primary: #1e3a8a;
+            --primary-light: #eff6ff;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --border: #e2e8f0;
+            --danger-bg: #fee2e2;
+            --danger-text: #991b1b;
+            --warning-bg: #ffedd5;
+            --warning-text: #9a3412;
+            --code-bg: #f1f5f9;
+        }
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--text);
+            background-color: var(--bg);
+            margin: 0;
+            padding: 24px;
+        }
+        .container {
+            max-width: 960px;
+            margin: 0 auto;
+            background: var(--card-bg);
+            border-radius: 8px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+            padding: 36px;
+        }
+        h1 {
+            color: #0f172a;
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 12px;
+            margin-top: 0;
+            font-size: 1.75rem;
+        }
+        h2 {
+            color: var(--primary);
+            margin-top: 32px;
+            border-left: 4px solid #3b82f6;
+            padding-left: 12px;
+            font-size: 1.35rem;
+        }
+        h3 {
+            color: #334155;
+            margin-top: 20px;
+            font-size: 1.1rem;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            border-radius: 4px;
+            margin-right: 8px;
+        }
+        .badge-sev2 { background-color: var(--danger-bg); color: var(--danger-text); }
+        .badge-fail { background-color: var(--warning-bg); color: var(--warning-text); }
+        .badge-code { background-color: var(--code-bg); color: #475569; font-family: monospace; }
+        .card {
+            background-color: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 18px 20px;
+            margin-bottom: 20px;
+        }
+        .complaint {
+            font-style: italic;
+            color: #334155;
+            background: #e2e8f0;
+            padding: 10px 14px;
+            border-left: 4px solid var(--text-muted);
+            border-radius: 0 4px 4px 0;
+            margin-bottom: 14px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            margin-bottom: 24px;
+            font-size: 0.95rem;
+        }
+        th, td {
+            border: 1px solid #cbd5e1;
+            padding: 10px 14px;
+            text-align: left;
+            vertical-align: top;
+        }
+        th {
+            background-color: #f1f5f9;
+            color: #334155;
+            font-weight: 600;
+        }
+        code {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            background: var(--code-bg);
+            color: #b91c1c;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+        ul, ol {
+            padding-left: 22px;
+            margin-bottom: 10px;
+        }
+        li {
+            margin-bottom: 6px;
+        }
+        .meta-box {
+            background-color: var(--primary-light);
+            border: 1px solid #bfdbfe;
+            border-radius: 6px;
+            padding: 14px 18px;
+            margin: 20px 0;
+            font-size: 0.95rem;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Olay Kanalı &middot; INCIDENT-2041 (SEV-2) Kök Neden Analiz Raporu</h1>
+    
+    <div style="margin: 16px 0;">
+        <span class="badge badge-sev2">SEVERITY: SEV-2</span>
+        <span class="badge badge-fail">DURUM: 4/4 Şikayet Doğrulandı (FAIL)</span>
+        <span class="badge badge-code">Bileşen: services/core</span>
+    </div>
+
+    <div class="meta-box">
+        <strong>Özet:</strong> <code>fixtures/incident/repro.py</code> simülasyonu ve <code>services/core</code> kod incelemesi sonucunda, Müşteri Deneyimi, Mutabakat ve Mobil Takım şikayetlerinin altında yatan <strong>5 temel kök neden</strong> ve ilgili kod satırları aşağıda detaylandırılmıştır.
+    </div>
+
+    <!-- 1. MÜŞTERİ DENEYİMİ -->
+    <h2>1. Müşteri Deneyimi Şikayetleri</h2>
+
+    <div class="card">
+        <div class="complaint">
+            <strong>Şikayet:</strong> "Müşteriler parasının iki kez düştüğünü söylüyor."
+        </div>
+        <h3>Kök Neden 1: Idempotency (Mükerrer İstek) Kontrolünün Bulunmaması</h3>
+        <ul>
+            <li><strong>İlgili Dosyalar:</strong> <code>services/core/main.py:30-31</code> ve <code>services/core/service.py:19-58</code></li>
+            <li><strong>Teknik Açıklama:</strong> <code>/transfers</code> uç noktası <code>Idempotency-Key</code> HTTP başlığını parametre olarak almaktadır; ancak <code>service.execute_transfer()</code> fonksiyonu içerisinde <code>store.idempotency</code> sözlüğü asla kontrol edilmemekte ve yeni işlem oluştuktan sonra anahtar buraya kaydedilmemektedir.</li>
+            <li><strong>Etki:</strong> Ağ kesintisi veya istemci taraflı yeniden denemelerde (retry) aynı transfer iki kez yürütülerek hesaptan mükerrer bakiye düşmektedir.</li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <div class="complaint">
+            <strong>Şikayet:</strong> "Bazıları yanlış hesap yazıyor, parası düşüyor ama alıcıya hiç gitmiyor. Ekranda Internal Server Error."
+        </div>
+        <h3>Kök Neden 2: Atomik Olmayan İşlem Sırası ("Önce Yaz, Sonra Doğrula" Hatası)</h3>
+        <ul>
+            <li><strong>İlgili Dosya:</strong> <code>services/core/service.py:27-36</code></li>
+            <li><strong>Teknik Açıklama:</strong> Transfer akışında önce gönderenin bakiyesi düşülmekte (<code>src["balance"] = src["balance"] - total</code>), ardından alıcı hesap aranmaktadır (<code>dst = store.accounts[req.to_account]</code>). Alıcı hesap sistemde yoksa Python <code>KeyError</code> fırlatmakta ve işlem yarım kalmaktadır.</li>
+            <li><strong>Etki:</strong> Gönderenin parası hesaptan düşülmüş olarak kalmakta, alıcıya para gitmemekte ve yakalanmayan <code>KeyError</code> nedeniyle istemciye <code>500 Internal Server Error</code> dönmektedir (Para kaybolmaktadır).</li>
+        </ul>
+    </div>
+
+    <!-- 2. MUTABAKAT -->
+    <h2>2. Mutabakat Şikayetleri</h2>
+
+    <div class="card">
+        <div class="complaint">
+            <strong>Şikayet:</strong> "Bakiyeler kuruş altı farklarla tutmuyor (99.00000000000006)..."
+        </div>
+        <h3>Kök Neden 3: Float (İkili Kayan Nokta) Aritmetiği ve Hassasiyet Kaybı</h3>
+        <ul>
+            <li><strong>İlgili Dosyalar:</strong> <code>services/core/models.py:8,15</code>, <code>services/core/fees.py:4</code>, <code>services/core/service.py:22,27,36</code></li>
+            <li><strong>Teknik Açıklama:</strong> Pydantic modellerinde ve transfer hesaplamalarında para değerleri <code>decimal.Decimal</code> yerine <code>float</code> olarak tanımlanmıştır. IEEE 754 ikili kayan nokta standardının doğası gereği ondalık sayılarda kayan nokta sapması (floating-point drift) oluşmaktadır.</li>
+            <li><strong>Kural İhlali:</strong> <code>docs/ENGINEERING-HANDBOOK.md &sect;1</code> ("Para tutarları kod içinde decimal.Decimal ile tutulur. float ile para hesabı yapılmaz.") standardı ihlal edilmiştir.</li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <div class="complaint">
+            <strong>Şikayet:</strong> "...bazı ücretler politikadan 1 kuruş düşük."
+        </div>
+        <h3>Kök Neden 4: Banker's Rounding ve Eşik Değer (&ge; 1000) Mantık Hatası</h3>
+        <ul>
+            <li><strong>İlgili Dosya:</strong> <code>services/core/fees.py:4-9</code></li>
+            <li><strong>Teknik Açıklama:</strong>
+                <ol>
+                    <li>Python'ın yerleşik <code>round(amount * rate, 2)</code> fonksiyonu "en yakın çift sayıya yuvarlama" (Banker's rounding) uygular. Örneğin <code>3.00 * 0.005 = 0.015</code> işleminde sonuç <code>0.02</code> yerine <code>0.01</code> çıkmaktadır. (Politika kuralı: <code>ROUND_HALF_UP</code>).</li>
+                    <li><code>if amount > 1000:</code> kontrolü nedeniyle tam <code>1000.00 TL</code> tutarındaki transferler için %0,25 yerine hatalı olarak %0,50 oranı işletilmektedir (<code>docs/FEE-POLICY.md</code> gereği 1000.00 TL eşiğe dahildir).</li>
+                </ol>
+            </li>
+        </ul>
+    </div>
+
+    <!-- 3. MOBİL EKİP -->
+    <h2>3. Mobil Ekip Şikayetleri</h2>
+
+    <div class="card">
+        <div class="complaint">
+            <strong>Şikayet:</strong> "Yetersiz bakiyede, negatif tutarda, bilinmeyen hesapta bize düzgün hata gelmiyor, sunucu 500 dönüyor."
+        </div>
+        <h3>Kök Neden 5: Standart Hata Zarfı ve Exception Yönetimi Eksikliği</h3>
+        <ul>
+            <li><strong>İlgili Dosyalar:</strong> <code>services/core/service.py:20,25,35</code> ve <code>services/core/main.py:23-26, 36-39</code></li>
+            <li><strong>Teknik Açıklama:</strong>
+                <ol>
+                    <li>Yetersiz bakiyede <code>raise Exception("insufficient funds")</code> gibi ham bir istisna fırlatılmakta ve FastAPI bunu yakalayamayıp <code>500 Internal Server Error</code> dönmektedir (Beklenen: <code>409 INSUFFICIENT_FUNDS</code>).</li>
+                    <li>Hesap bulunamadığında doğrudan sözlük erişimi (<code>store.accounts[...]</code>) yapıldığı için yakalanmayan <code>KeyError</code> ile 500 hatası oluşmaktadır (Beklenen: <code>404 ACCOUNT_NOT_FOUND</code>).</li>
+                    <li>Negatif tutarlar (<code>amount <= 0</code>) doğrulanmamakta; ayrıca FastAPI'nin varsayılan <code>{"detail": ...}</code> hata formatı standart hata zarfına (<code>{"error": {"code": "...", "message": "..."}}</code>) dönüştürülmemektedir.</li>
+                </ol>
+            </li>
+            <li><strong>Kural İhlali:</strong> <code>docs/ENGINEERING-HANDBOOK.md &sect;2</code> ("Tüm hatalar tek bir hata zarfı ile döner. Çıplak detail gövdesi veya stack trace istemciye asla gönderilmez.") standardı ihlal edilmiştir.</li>
+        </ul>
+    </div>
+
+    <!-- TABLO -->
+    <h2>4. Sorun &middot; Dosya &middot; Kök Neden Özeti</h2>
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 20%;">Şikayet / Belirti</th>
+                <th style="width: 25%;">İlgili Dosya & Satır</th>
+                <th style="width: 25%;">Hatalı Kod Mantığı</th>
+                <th style="width: 30%;">Kök Neden Özeti</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>Çift Borçlandırma</strong></td>
+                <td><code>services/core/service.py:19</code></td>
+                <td><code>idempotency_key</code> parametresi kullanılmıyor</td>
+                <td>Idempotency mekanizmasının işletilmemesi.</td>
+            </tr>
+            <tr>
+                <td><strong>Kayıp Para & 500</strong></td>
+                <td><code>services/core/service.py:27-36</code></td>
+                <td><code>src["balance"] -= total</code> satırı alıcı doğrulanmadan önce çalışıyor</td>
+                <td>Atomiklik ihlali; alıcı bulunamadığında bakiye geri alınmadan <code>KeyError</code> ile çökmesi.</td>
+            </tr>
+            <tr>
+                <td><strong>Kuruş Artıkları</strong></td>
+                <td><code>services/core/models.py:8,15</code><br><code>services/core/fees.py:4</code></td>
+                <td><code>balance: float</code>, <code>amount: float</code></td>
+                <td><code>Decimal</code> yerine <code>float</code> kullanımı nedeniyle kayan nokta artıklarının oluşması.</td>
+            </tr>
+            <tr>
+                <td><strong>1 Kuruş Düşük Ücret</strong></td>
+                <td><code>services/core/fees.py:4-9</code></td>
+                <td><code>round(amount * rate, 2)</code> ve <code>amount > 1000</code></td>
+                <td>Banker's rounding (0.015 &rarr; 0.01) ve eşik değerin (&ge; 1000) dahil edilmemesi.</td>
+            </tr>
+            <tr>
+                <td><strong>Mobil 500 Hataları</strong></td>
+                <td><code>services/core/service.py:25</code><br><code>services/core/main.py:23-39</code></td>
+                <td><code>raise Exception(...)</code> ve yakalanmayan <code>KeyError</code></td>
+                <td>Özel hata zarfı ve HTTP durum kodları (404, 409, 422) yerine yakalanmayan istisnalar.</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+</body>
+</html>

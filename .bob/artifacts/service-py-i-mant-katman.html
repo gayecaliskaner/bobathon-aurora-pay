@@ -1,0 +1,305 @@
+
+<html lang="tr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>service.py — İş Mantığı Katmanı</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    color: #1f2328;
+    background: #ffffff;
+    padding: 32px 16px 48px;
+  }
+  .page { max-width: 760px; margin: 0 auto; }
+
+  h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+  h2 { font-size: 16px; font-weight: 700; margin: 32px 0 12px; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; }
+  h3 { font-size: 14px; font-weight: 700; margin: 20px 0 8px; }
+  p  { margin-bottom: 10px; }
+
+  .subtitle { color: #57606a; font-size: 13px; margin-bottom: 28px; }
+  .filepath  { font-family: monospace; font-size: 12px; background: #f7f8fa; border: 1px solid #e5e7eb; border-radius: 4px; padding: 2px 7px; }
+
+  /* Overview cards */
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px; }
+  .card  { background: #f7f8fa; border: 1px solid #e5e7eb; border-radius: 6px; padding: 14px 16px; }
+  .card .num  { font-size: 26px; font-weight: 700; color: #3b82d4; }
+  .card .lbl  { font-size: 12px; color: #57606a; margin-top: 2px; }
+
+  /* Function blocks */
+  .fn-block {
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    margin-bottom: 18px;
+    overflow: hidden;
+  }
+  .fn-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #f7f8fa;
+    padding: 10px 16px;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  .fn-name  { font-family: monospace; font-size: 13px; font-weight: 700; color: #1f2328; }
+  .fn-badge {
+    font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px;
+  }
+  .badge-read   { background: #dbeafe; color: #1d4ed8; }
+  .badge-write  { background: #dcfce7; color: #15803d; }
+  .badge-atomic { background: #fef9c3; color: #854d0e; }
+  .fn-body { padding: 14px 16px; }
+  .fn-sig  { font-family: monospace; font-size: 12px; background: #f7f8fa; border: 1px solid #e5e7eb; border-radius: 4px; padding: 8px 12px; margin-bottom: 12px; white-space: pre-wrap; }
+  .kv-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .kv-table th { text-align: left; color: #57606a; font-weight: 600; width: 120px; padding: 4px 8px 4px 0; border-bottom: 1px solid #f0f0f0; }
+  .kv-table td { padding: 4px 8px 4px 0; border-bottom: 1px solid #f0f0f0; }
+  .kv-table tr:last-child th,
+  .kv-table tr:last-child td { border-bottom: none; }
+  code { font-family: monospace; font-size: 12px; background: #f7f8fa; border: 1px solid #e5e7eb; border-radius: 3px; padding: 1px 5px; }
+
+  /* Flow diagram */
+  .flow { display: flex; flex-direction: column; align-items: flex-start; gap: 0; margin: 12px 0; }
+  .flow-step {
+    display: flex; align-items: flex-start; gap: 12px;
+  }
+  .flow-line { display: flex; flex-direction: column; align-items: center; min-width: 24px; }
+  .flow-dot  { width: 12px; height: 12px; border-radius: 50%; background: #3b82d4; margin-top: 4px; flex-shrink: 0; }
+  .flow-dot.red  { background: #ef4444; }
+  .flow-dot.green{ background: #22c55e; }
+  .flow-dot.yellow{ background: #f59e0b; }
+  .flow-connector { width: 2px; background: #e5e7eb; flex: 1; min-height: 20px; }
+  .flow-text { padding-bottom: 18px; }
+  .flow-text strong { display: block; font-size: 13px; }
+  .flow-text span   { font-size: 12px; color: #57606a; }
+
+  /* Error table */
+  .err-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .err-table th { background: #f7f8fa; text-align: left; padding: 8px 12px; border: 1px solid #e5e7eb; font-weight: 600; color: #57606a; }
+  .err-table td { padding: 8px 12px; border: 1px solid #e5e7eb; }
+  .err-table tr:hover td { background: #f7f8fa; }
+  .pill { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 10px; }
+  .pill-404 { background: #fee2e2; color: #991b1b; }
+  .pill-409 { background: #fef9c3; color: #854d0e; }
+
+  /* Fee table */
+  .fee-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .fee-table th { background: #f7f8fa; text-align: left; padding: 8px 12px; border: 1px solid #e5e7eb; font-weight: 600; color: #57606a; }
+  .fee-table td { padding: 8px 12px; border: 1px solid #e5e7eb; }
+
+  /* Thread safety note */
+  .note { background: #fef9c3; border: 1px solid #fde68a; border-radius: 6px; padding: 12px 16px; font-size: 13px; margin-bottom: 20px; }
+  .note strong { color: #854d0e; }
+
+  /* Footer */
+  footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid #e5e7eb; text-align: center; font-size: 12px; color: #57606a; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <h1>service.py</h1>
+  <p class="subtitle">
+    <span class="filepath">services/core/service.py</span>  — 
+    Aurora Pay iş mantığı katmanı (business logic layer)
+  </p>
+
+  
+  <div class="cards">
+    <div class="card"><div class="num">3</div><div class="lbl">Public Fonksiyon</div></div>
+    <div class="card"><div class="num">1</div><div class="lbl">Threading Lock</div></div>
+    <div class="card"><div class="num">4</div><div class="lbl">Hata Türü</div></div>
+  </div>
+
+  
+  <div class="note">
+    <strong>⚙ Thread Güvenliği:</strong> Durum değişiklikleri (bakiye okuma + yazma, idempotency kontrolü) tek bir
+    <code>threading.Lock</code> ile korunur. Bu sayede aynı anda gelen iki istek aynı bakiyeyi okuyup çift harcama
+    yapamaz.
+  </div>
+
+  <h2>Modül Bağımlılıkları</h2>
+  <p>
+    <code>service.py</code> aşağıdaki modülleri kullanır:
+  </p>
+  <table class="kv-table">
+    <tr><th>Modül</th><td>Görev</td></tr>
+    <tr><th><code>store</code></th><td>Bellek içi veri deposu — <code>accounts</code>, <code>transfers</code>, <code>idempotency</code> sözlükleri</td></tr>
+    <tr><th><code>fees</code></th><td>Transfer ücreti hesaplama (<code>fee_for(amount)</code>)</td></tr>
+    <tr><th><code>reports</code></th><td>Transfer kaydı raporlama (<code>record_transfer()</code>)</td></tr>
+    <tr><th><code>errors</code></th><td>Uygulama hata sınıfları</td></tr>
+    <tr><th><code>models</code></th><td>Pydantic giriş modelleri (<code>AccountCreate</code>, <code>TransferRequest</code>)</td></tr>
+  </table>
+
+  
+  <h2>Fonksiyonlar</h2>
+
+  
+  <div class="fn-block">
+    <div class="fn-header">
+      <span class="fn-name">get_account</span>
+      <span class="fn-badge badge-read">Okuma</span>
+    </div>
+    <div class="fn-body">
+      <div class="fn-sig">def get_account(account_id: str) -&gt; dict</div>
+      <table class="kv-table">
+        <tr><th>Parametre</th><td><code>account_id: str</code> — aranacak hesap kimliği</td></tr>
+        <tr><th>Dönüş</th><td><code>dict</code> — hesap verisi</td></tr>
+        <tr><th>Hata</th><td><code>AccountNotFound</code> → HTTP 404 (hesap yoksa)</td></tr>
+        <tr><th>Kilit</th><td>Kullanmaz — yalnızca okuma yaptığı için güvenli</td></tr>
+      </table>
+      <p style="margin-top:10px;font-size:13px">
+        <code>store.accounts</code> sözlüğünde <code>account_id</code> anahtarını arar.
+        Kayıt yoksa <code>AccountNotFound</code> fırlatır; <code>main.py</code>'deki hata işleyici bunu
+        <code>{"error": {"code": "ACCOUNT_NOT_FOUND", ...}}</code> zarfına dönüştürür.
+      </p>
+    </div>
+  </div>
+
+  
+  <div class="fn-block">
+    <div class="fn-header">
+      <span class="fn-name">create_account</span>
+      <span class="fn-badge badge-write">Yazma</span>
+    </div>
+    <div class="fn-body">
+      <div class="fn-sig">def create_account(data: AccountCreate) -&gt; dict</div>
+      <table class="kv-table">
+        <tr><th>Parametre</th><td><code>data: AccountCreate</code> — id, owner_name, iban, balance, currency</td></tr>
+        <tr><th>Dönüş</th><td><code>dict</code> — oluşturulan hesap verisi</td></tr>
+        <tr><th>Hata</th><td><code>AccountAlreadyExists</code> → HTTP 409 (aynı id zaten varsa)</td></tr>
+        <tr><th>Kilit</th><td>Kullanır — duplikasyon kontrolü atomik yapılır</td></tr>
+      </table>
+      <p style="margin-top:10px;font-size:13px">
+        <code>_lock</code> alındıktan sonra, aynı <code>id</code> ile kayıt olup olmadığı kontrol edilir.
+        Yoksa <code>model_dump()</code> ile dict'e dönüştürülüp <code>store.accounts</code>'a yazılır.
+      </p>
+    </div>
+  </div>
+
+  
+  <div class="fn-block">
+    <div class="fn-header">
+      <span class="fn-name">execute_transfer</span>
+      <span class="fn-badge badge-atomic">Atomik Yazma</span>
+    </div>
+    <div class="fn-body">
+      <div class="fn-sig">def execute_transfer(req: TransferRequest, idempotency_key: str | None = None) -&gt; dict</div>
+      <table class="kv-table">
+        <tr><th>Parametre</th><td><code>req: TransferRequest</code> — from_account, to_account, amount, currency</td></tr>
+        <tr><th>Parametre</th><td><code>idempotency_key: str | None</code> — <code>Idempotency-Key</code> başlığından gelir</td></tr>
+        <tr><th>Dönüş</th><td><code>dict</code> — tamamlanmış transfer kaydı</td></tr>
+        <tr><th>Hata</th><td><code>AccountNotFound</code> 404 · <code>InsufficientFunds</code> 409</td></tr>
+        <tr><th>Kilit</th><td>Kullanır — tüm okuma + yazma dizisi tek kritik bölgede</td></tr>
+      </table>
+
+      <h3>Yürütme Akışı</h3>
+      <div class="flow">
+        <div class="flow-step">
+          <div class="flow-line"><div class="flow-dot yellow"></div><div class="flow-connector"></div></div>
+          <div class="flow-text"><strong>1 · İdempotency Kontrolü</strong><span>Aynı anahtar daha önce işlendiyse, kaydedilmiş sonucu hemen döner — hiçbir bakiye değişmez.</span></div>
+        </div>
+        <div class="flow-step">
+          <div class="flow-line"><div class="flow-dot"></div><div class="flow-connector"></div></div>
+          <div class="flow-text"><strong>2 · Hesap Doğrulama</strong><span><code>get_account(from)</code> ve <code>get_account(to)</code> çağrılır; biri yoksa kilit bırakılır, hata fırlatılır.</span></div>
+        </div>
+        <div class="flow-step">
+          <div class="flow-line"><div class="flow-dot"></div><div class="flow-connector"></div></div>
+          <div class="flow-text"><strong>3 · Ücret Hesaplama</strong><span><code>fees.fee_for(amount)</code> → tutar ≥ 1000 TL ise %0,25 · aksi hâlde %0,50</span></div>
+        </div>
+        <div class="flow-step">
+          <div class="flow-line"><div class="flow-dot red"></div><div class="flow-connector"></div></div>
+          <div class="flow-text"><strong>4 · Bakiye Kontrolü</strong><span><code>src.balance &lt; amount + fee</code> ise <code>InsufficientFunds</code> fırlatılır — hiçbir bakiye değişmez.</span></div>
+        </div>
+        <div class="flow-step">
+          <div class="flow-line"><div class="flow-dot green"></div><div class="flow-connector"></div></div>
+          <div class="flow-text"><strong>5 · Transfer Kaydı Oluşturma</strong><span>UUID, zaman damgası ve <code>COMPLETED</code> durumuyla dict oluşturulur; <code>reports.record_transfer()</code> çağrılır.</span></div>
+        </div>
+        <div class="flow-step">
+          <div class="flow-line"><div class="flow-dot green"></div><div class="flow-connector"></div></div>
+          <div class="flow-text"><strong>6 · Bakiye Güncelleme</strong><span><code>src.balance -= (amount + fee)</code> · <code>dst.balance += amount</code></span></div>
+        </div>
+        <div class="flow-step">
+          <div class="flow-line"><div class="flow-dot green"></div><div class="flow-connector" style="display:none"></div></div>
+          <div class="flow-text"><strong>7 · İdempotency Kayıt + Loglama</strong><span>Sonuç <code>store.idempotency</code>'e yazılır; kilit bırakılır; <code>logger.info</code> ile transfer_id loglanır.</span></div>
+        </div>
+      </div>
+
+      <div class="note" style="margin-top:10px">
+        <strong>Önce doğrula, sonra yaz kuralı:</strong> Tüm kontroller (hesap varlığı + bakiye) yazma adımlarından
+        önce yapılır. Dolayısıyla herhangi bir doğrulama hatası bakiye değişikliğine yol açmaz.
+      </div>
+    </div>
+  </div>
+
+  
+  <h2>Ücret Politikası (<code>fees.py</code>)</h2>
+  <table class="fee-table">
+    <tr><th>Tutar Aralığı</th><th>Oran</th><th>Örnek (1500 TL)</th></tr>
+    <tr><td>&lt; 1.000,00 TL</td><td>%0,50</td><td>1500 × 0,005 = <strong>7,50 TL</strong></td></tr>
+    <tr><td>≥ 1.000,00 TL (eşik dahil)</td><td>%0,25</td><td>1500 × 0,0025 = <strong>3,75 TL</strong></td></tr>
+  </table>
+  <p style="font-size:12px;color:#57606a;margin-top:6px">Yuvarlama: <code>ROUND_HALF_UP</code>, 2 ondalık basamak (<code>Decimal</code>).</p>
+
+  
+  <h2>Hata Türleri</h2>
+  <table class="err-table">
+    <tr><th>Sınıf</th><th>HTTP</th><th>Kod</th><th>Ne Zaman</th></tr>
+    <tr>
+      <td><code>AccountNotFound</code></td>
+      <td><span class="pill pill-404">404</span></td>
+      <td><code>ACCOUNT_NOT_FOUND</code></td>
+      <td>Kaynak veya hedef hesap deposunda bulunamadı</td>
+    </tr>
+    <tr>
+      <td><code>AccountAlreadyExists</code></td>
+      <td><span class="pill pill-409">409</span></td>
+      <td><code>ACCOUNT_ALREADY_EXISTS</code></td>
+      <td>Aynı <code>id</code> ile hesap oluşturulmaya çalışıldı</td>
+    </tr>
+    <tr>
+      <td><code>InsufficientFunds</code></td>
+      <td><span class="pill pill-409">409</span></td>
+      <td><code>INSUFFICIENT_FUNDS</code></td>
+      <td>Kaynak hesap bakiyesi tutar + ücret için yetersiz</td>
+    </tr>
+    <tr>
+      <td><code>TransferNotFound</code></td>
+      <td><span class="pill pill-404">404</span></td>
+      <td><code>TRANSFER_NOT_FOUND</code></td>
+      <td><em>service.py içinde doğrudan kullanılmaz</em> — <code>main.py</code> tarafından tetiklenir</td>
+    </tr>
+  </table>
+
+  
+  <h2>Loglama</h2>
+  <p>Logger adı: <code>aurora.core</code>. Tüm loglar <code>logging</code> modülü ile yapılır (<code>print</code> yok).</p>
+  <p>PII (ad, IBAN, e-posta, kart) loglara yazılmaz; yalnızca <code>transfer_id</code>, <code>from_account</code> ve <code>to_account</code> (kimlik değerleri) loglanır.</p>
+
+  
+  <h2>Giriş Modelleri (<code>models.py</code>)</h2>
+  <h3>AccountCreate</h3>
+  <table class="kv-table">
+    <tr><th><code>id</code></th><td>str — hesap kimliği (benzersiz)</td></tr>
+    <tr><th><code>owner_name</code></th><td>str — hesap sahibi adı</td></tr>
+    <tr><th><code>iban</code></th><td>str — IBAN numarası</td></tr>
+    <tr><th><code>balance</code></th><td>Decimal ≥ 0, 2 ondalık</td></tr>
+    <tr><th><code>currency</code></th><td>str, varsayılan <code>"TRY"</code></td></tr>
+  </table>
+  <h3 style="margin-top:16px">TransferRequest</h3>
+  <table class="kv-table">
+    <tr><th><code>from_account</code></th><td>str — kaynak hesap</td></tr>
+    <tr><th><code>to_account</code></th><td>str — hedef hesap (kaynak ile farklı olmalı)</td></tr>
+    <tr><th><code>amount</code></th><td>Decimal &gt; 0, 2 ondalık</td></tr>
+    <tr><th><code>currency</code></th><td>str, varsayılan <code>"TRY"</code></td></tr>
+    <tr><th><code>note</code></th><td>str | None — opsiyonel açıklama</td></tr>
+  </table>
+
+</div>
+
+<footer>Made with IBM Bob</footer>
+</body>
+</html>

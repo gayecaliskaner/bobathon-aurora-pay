@@ -1,0 +1,148 @@
+
+<html lang="tr">
+<head>
+<meta charset="utf-8" />
+<title>Aurora Pay Bobathon: Repo Özeti</title>
+<style>
+body{margin:0;background:#fff;color:#1f2328;font-family:-apple-system,"Segoe UI",system-ui,sans-serif;font-size:14.5px;line-height:1.6}
+main{max-width:760px;margin:0 auto;padding:40px 20px}
+h1{font-size:26px;margin:0 0 4px}
+h2{font-size:18px;margin:36px 0 10px;padding-bottom:6px;border-bottom:1px solid #e5e7eb}
+h3{font-size:15px;margin:18px 0 6px}
+p{margin:8px 0}
+.muted{color:#57606a}
+.lead{color:#57606a;margin-bottom:20px}
+table{width:100%;border-collapse:collapse;margin:10px 0;font-size:13.5px}
+th,td{border:1px solid #e5e7eb;padding:6px 10px;text-align:left;vertical-align:top}
+th{background:#f7f8fa}
+code{background:#f7f8fa;border:1px solid #e5e7eb;border-radius:3px;padding:0 4px;font-size:12.5px}
+pre{background:#f7f8fa;border:1px solid #e5e7eb;border-radius:4px;padding:10px 12px;overflow-x:auto;font-size:12.5px;line-height:1.5}
+pre code{border:0;padding:0;background:none}
+.box{background:#f7f8fa;border:1px solid #e5e7eb;border-left:3px solid #3b82d4;padding:10px 14px;margin:12px 0}
+.warn{border-left-color:#7c5cd8}
+ul{margin:6px 0;padding-left:22px}
+footer{margin-top:48px;padding-top:12px;border-top:1px solid #e5e7eb;text-align:center;font-size:12px;color:#57606a}
+</style>
+</head>
+<body>
+<main>
+<h1>Aurora Pay Bobathon</h1>
+<p class="lead">Aurora Bank "Instant Pay" ekibi senaryosuna dayanan, IBM Bob özelliklerini uygulamalı öğreten bir atölye (bobathon) reposu.</p>
+
+<h2>1. Repo nedir?</h2>
+<p>Katılımcılar Aurora Bank'ın Instant Pay ekibine katılmış olur. Dokuz kısa görev (M0-M8) vardır. Her görev <strong>tek bir probleme</strong> odaklanır, 1-2 hamlede çözülür ve <strong>tek bir Bob özelliğini</strong> gösterir. Hazır prompt yoktur: katılımcı durumu okur, hedefi anlar ve Bob'u kendisi yönlendirir. Her görevin sonucu otomatik testlerle doğrulanır.</p>
+<table>
+<tr><th>Alan</th><th>Değer</th></tr>
+<tr><td>Dil / çatı</td><td>Python, FastAPI, Pydantic v2, Uvicorn</td></tr>
+<tr><td>Test</td><td>pytest, pytest-cov, httpx</td></tr>
+<tr><td>Güvenlik taraması</td><td>semgrep (özel kurallar: <code>security/semgrep-rules.yml</code>)</td></tr>
+<tr><td>Dil (dokümanlar)</td><td>Türkçe</td></tr>
+<tr><td>Git geçmişi</td><td>Tek commit: "Add Aurora Pay Bobathon participant repository" (<code>main</code>)</td></tr>
+<tr><td>Toplam süre</td><td>Yaklaşık 170 dakika</td></tr>
+</table>
+
+<h2>2. Görevler</h2>
+<table>
+<tr><th>#</th><th>Görev</th><th>Tür</th><th>Bob özelliği</th><th>Süre</th></tr>
+<tr><td>M0</td><td>Hazırlık</td><td>Temel kullanım</td><td>Mod seçici, <code>@</code> bağlamı</td><td>10 dk</td></tr>
+<tr><td>M1</td><td>Dokümandan koda</td><td>Document-to-code</td><td>Plan / Agent, todo listesi</td><td>25 dk</td></tr>
+<tr><td>M2</td><td>Üretim hatası</td><td>Bug fix</td><td>Bob Shell / CLI</td><td>20 dk</td></tr>
+<tr><td>M3</td><td>Kendi custom mode'um</td><td>Takım standardı</td><td>Custom Mode, Rules, Skills</td><td>20 dk</td></tr>
+<tr><td>M4</td><td>Kapsamlı test</td><td>Unit test</td><td>M3'teki mod ve skill</td><td>25 dk</td></tr>
+<tr><td>M5</td><td>Güvenlik bulguları</td><td>Security</td><td>Bob Findings, Fix with Bob</td><td>20 dk</td></tr>
+<tr><td>M6</td><td>Tuzağa düşmeyen asistan</td><td>Security</td><td>Prompt injection, <code>.bobignore</code></td><td>20 dk</td></tr>
+<tr><td>M7</td><td>Harcamayı görün</td><td>Ölçüm</td><td>Bobcoin, Bob Admin, Bobalytics</td><td>15 dk</td></tr>
+<tr><td>M8</td><td>GitHub'a teslim</td><td>Teslimat</td><td>Commit, push, PR</td><td>15 dk</td></tr>
+</table>
+<p class="muted">Bağımlılıklar: M4, M3'ün modunu kullanır. M8, önceki işlerin commit'lenmesini bekler. Diğerleri bağımsızdır. Süre kısıtlıysa kesilebilecek sıra: M1, M4 (bonus), M0.</p>
+
+<h2>3. Klasör yapısı</h2>
+<table>
+<tr><th>Yol</th><th>İçerik</th></tr>
+<tr><td><code>missions/</code></td><td>M0-M8 görev kartları</td></tr>
+<tr><td><code>docs/</code></td><td>PRD (limits), API sözleşmesi (<code>API-SPEC-limits.yaml</code>), <code>INCIDENT-2041</code>, <code>SECURITY-TICKET-317</code>, <code>FEE-POLICY</code>, <code>ENGINEERING-HANDBOOK</code></td></tr>
+<tr><td><code>services/core/</code></td><td>Üzerinde çalışılan "Aurora Core" servisi</td></tr>
+<tr><td><code>fixtures/</code></td><td>Olay logu ve yeniden üretme betiği, tedarikçi SDK (FraudShield), müşteri verisi</td></tr>
+<tr><td><code>deploy/</code></td><td>Dockerfile, Terraform, worker bağımlılıkları</td></tr>
+<tr><td><code>verify/</code></td><td>Görev başına otomatik kabul testleri (<code>test_m0..m8</code>), <code>run.sh</code>, mutant yardımcıları</td></tr>
+<tr><td><code>security/</code>, <code>scripts/scan.sh</code></td><td>semgrep kuralları ve tarama betiği</td></tr>
+<tr><td><code>tests/</code></td><td>Başlangıç testi (<code>test_health.py</code>)</td></tr>
+<tr><td><code>.github/</code></td><td>CI iş akışı ve PR şablonu</td></tr>
+<tr><td><code>KATILIMCI-KILAVUZU.html</code></td><td>Katılımcı kılavuzu</td></tr>
+</table>
+
+<h2>4. Aurora Core servisi</h2>
+<p>Bellek içi (in-memory) depolama kullanan küçük bir FastAPI uygulamasıdır (<code>Aurora Core</code> v0.1.0). Yaklaşık 200 satır Python içerir.</p>
+<table>
+<tr><th>Uç nokta</th><th>İşlev</th></tr>
+<tr><td><code>GET /health</code></td><td>Sağlık kontrolü</td></tr>
+<tr><td><code>POST /accounts</code>, <code>GET /accounts/{id}</code></td><td>Hesap oluşturma ve sorgulama</td></tr>
+<tr><td><code>POST /transfers</code></td><td>Para transferi (<code>Idempotency-Key</code> başlığı alır)</td></tr>
+<tr><td><code>GET /transfers/{id}</code></td><td>Transfer sorgulama</td></tr>
+<tr><td><code>GET /reports/transfers?owner=</code></td><td>Sahibe göre transfer raporu (SQLite)</td></tr>
+<tr><td><code>POST /reports/archive</code></td><td>Ekstre arşivleme (<code>tar</code> komutu)</td></tr>
+</table>
+<table>
+<tr><th>Dosya</th><th>Rol</th></tr>
+<tr><td><code>main.py</code></td><td>Rotalar</td></tr>
+<tr><td><code>service.py</code></td><td>Hesap ve transfer iş mantığı</td></tr>
+<tr><td><code>fees.py</code></td><td>Ücret hesaplama</td></tr>
+<tr><td><code>reports.py</code></td><td>Transfer logu araması, arşivleme</td></tr>
+<tr><td><code>store.py</code></td><td>Bellek içi veri; <code>reset()</code> test API'sidir, silinmemeli</td></tr>
+<tr><td><code>models.py</code>, <code>config.py</code></td><td>Pydantic modelleri, yapılandırma</td></tr>
+</table>
+
+<h2>5. Kasıtlı olarak bırakılmış sorunlar</h2>
+<p>Servis, görevlerin konusu olan hataları bilerek içerir. Bunlar atölye materyalidir, üretim kodu değildir.</p>
+<h3>M2: INCIDENT-2041 (SEV-2, çift borçlandırma)</h3>
+<ul>
+<li><code>Idempotency-Key</code> işlenmiyor, yeniden denemede tutar iki kez düşüyor.</li>
+<li>Önce borç yazılıp sonra alıcı aranıyor, atomik değil. Yanlış hesapta para kayboluyor.</li>
+<li>Para <code>float</code> ile hesaplanıyor (<code>99.00000000000006</code>). Ücret eşiği <code>&gt; 1000</code> olarak yazılmış, politika ise <code>≥ 1000</code> diyor. Yuvarlama <code>ROUND_HALF_UP</code> değil.</li>
+<li>Hatalar 500 dönüyor, el kitabındaki hata zarfı (<code>{"error": {"code": ...}}</code>) yok.</li>
+<li>Loglarda ad-soyad ve IBAN (PII) yazılıyor.</li>
+</ul>
+<h3>M5: SEC-317 (release gate)</h3>
+<ul>
+<li>A1: <code>config.py</code> içinde gömülü API anahtarı, parola ve JWT sırrı.</li>
+<li>A2: <code>reports.py</code> içinde f-string ile SQL injection.</li>
+<li>A3: <code>os.system</code> ile komut enjeksiyonu ve yol gezintisi.</li>
+<li>A4: Dockerfile (<code>python:3.9-slim</code>, root kullanıcı, gömülü token, <code>ADD http://</code>, <code>0.0.0.0</code>) ve Terraform hataları.</li>
+<li>A5: <code>deploy/worker/requirements.txt</code> içinde eski, zafiyetli sürümler.</li>
+<li>B: FraudShield SDK için <code>docs/VENDOR-REVIEW-fraudshield.md</code> güvenlik görüşü yazılacak.</li>
+</ul>
+<h3>M1: Limits &amp; Statements</h3>
+<p>PRD'ye göre günlük ve işlem başı limit uygulayan, onaylı işlemlerin ekstresini veren yeni bir servis sıfırdan yazılır (varsayılan: günlük 10.000,00, işlem başı 5.000,00 TRY; limitler dahildir; tek para birimi, bellek içi).</p>
+
+<h2>6. Mühendislik kuralları (kısa)</h2>
+<ul>
+<li>Para <code>Decimal</code> ile tutulur, <code>ROUND_HALF_UP</code>, 2 ondalık.</li>
+<li>Tüm hatalar tek bir hata zarfıyla döner; stack trace istemciye gitmez.</li>
+<li>Para hareketi atomiktir: önce doğrula, sonra yaz.</li>
+<li>PII loglanmaz; yalnızca <code>account_id</code> ve <code>transfer_id</code> kullanılır.</li>
+<li>Ücret: 0,01 ≤ tutar &lt; 1000,00 için %0,50; tutar ≥ 1000,00 için %0,25.</li>
+</ul>
+
+<h2>7. Kurulum ve doğrulama</h2>
+<pre><code>./setup.sh --scanners      # .venv (uygulama + dev) ve .venv-tools (semgrep)
+./verify/run.sh m0         # tek görev
+./verify/run.sh all        # özet tablo</code></pre>
+<p><strong>CI</strong> (<code>.github/workflows/ci.yml</code>): Python 3.12 ile <code>pytest --cov=services/core --cov-branch --cov-fail-under=85</code> ve <code>semgrep --error services deploy</code>. Semgrep taramasında <code># nosemgrep</code> ile susturma kabul edilmez.</p>
+
+<h2>8. Yerel çalışma durumu</h2>
+<div class="box warn">
+<p><strong>Git durumu:</strong> <code>verify/test_m0_setup.py</code> değiştirilmiş, <code>SESSION-NOTES.md</code> izlenmiyor (untracked).</p>
+</div>
+<p>Notlara göre M0 kurulumunda şu sorunlar çözüldü ve sonuç <strong>M0: PASS 7/7</strong> oldu:</p>
+<table>
+<tr><th>Belirti</th><th>Neden</th><th>Çözüm</th></tr>
+<tr><td>Python 3.10 istendi</td><td>EOL, güvenlik politikası engelliyor</td><td><code>brew install python@3.14</code></td></tr>
+<tr><td><code>Python 3.10+ gerekli.</code></td><td>PATH'teki <code>python3</code> eski</td><td><code>PYTHON=/opt/homebrew/bin/python3.14 ./setup.sh --scanners</code></td></tr>
+<tr><td><code>bob</code> bulunamadı</td><td>Bob Shell kurulu değil</td><td><code>npm install -g @ibm/bob</code> (sürüm 2.1.0)</td></tr>
+<tr><td>semgrep "yok"</td><td><code>.venv-tools/bin</code> PATH'te değil</td><td>Test, <code>scan.sh</code> ile aynı arama sırasını kullanacak şekilde güncellendi</td></tr>
+</table>
+
+<footer>Made with IBM Bob</footer>
+</main>
+</body>
+</html>
