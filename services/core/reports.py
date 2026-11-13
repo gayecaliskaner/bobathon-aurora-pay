@@ -28,14 +28,23 @@ def record_transfer(transfer: dict, owner_name: str) -> None:
     _conn.commit()
 
 
+import tarfile
+
 def find_transfers_by_owner(owner: str) -> list[dict]:
     columns = ["id", "owner_name", "from_account", "to_account", "amount", "created_at"]
     cursor = _conn.execute(
-        f"SELECT id, owner_name, from_account, to_account, amount, created_at FROM transfer_log WHERE owner_name = '{owner}'"
+        "SELECT id, owner_name, from_account, to_account, amount, created_at FROM transfer_log WHERE owner_name = ?",
+        (owner,),
     )
     return [dict(zip(columns, row)) for row in cursor.fetchall()]
 
 
 def archive_statements(filename: str) -> int:
-    command = "tar czf %s/%s.tgz reports/" % (config.ARCHIVE_DIR, filename)
-    return os.system(command)
+    try:
+        archive_path = os.path.join(config.ARCHIVE_DIR, f"{filename}.tgz")
+        os.makedirs(config.ARCHIVE_DIR, exist_ok=True)
+        with tarfile.open(archive_path, "w:gz") as tar:
+            tar.add("reports/", arcname="reports")
+        return 0
+    except Exception:
+        return 1

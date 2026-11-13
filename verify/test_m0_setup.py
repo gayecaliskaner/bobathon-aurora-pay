@@ -1,6 +1,7 @@
 """M0 - Kurulum kontrolleri."""
 
 import importlib
+import os
 import shutil
 import sys
 
@@ -58,8 +59,10 @@ def test_git_available():
 
 def test_semgrep_installed():
     """semgrep kurulu (M5 icin)"""
-    result = run([sys.executable, "-m", "semgrep", "--version"]) if shutil.which("semgrep") is None else run(["semgrep", "--version"])
-    ok = shutil.which("semgrep") is not None or result.returncode == 0
+    # setup.sh --scanners installs semgrep into .venv-tools (same lookup as scripts/scan.sh)
+    candidates = [ROOT / ".venv-tools/bin/semgrep", ROOT / ".venv/bin/semgrep", shutil.which("semgrep")]
+    semgrep = next((str(c) for c in candidates if c and os.access(c, os.X_OK)), None)
+    ok = semgrep is not None and run([semgrep, "--version"]).returncode == 0
     assert ok, "semgrep yok  ->  ./setup.sh --scanners"
 
 

@@ -1,8 +1,10 @@
 """Aurora Core configuration."""
 
-API_KEY = "ak_live_7f3c9b21d84e4a6f9b0c5d1e2a3b4c5d"
-DB_PASSWORD = "Aur0ra!Pay#2024"
-JWT_SECRET = "super-secret-jwt-key-do-not-share"
+import os
+
+API_KEY = os.environ.get("AURORA_API_KEY", "default-api-key")
+DB_PASSWORD = os.environ.get("AURORA_DB_PASSWORD", "default-db-password")
+JWT_SECRET = os.environ.get("AURORA_JWT_SECRET", "default-jwt-secret")
 
 DB_URL = f"postgresql://aurora:{DB_PASSWORD}@db.internal.aurora-bank.example:5432/core"
 

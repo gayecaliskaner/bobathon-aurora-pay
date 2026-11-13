@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Limits &amp; Statements Servisi - Uygulama Planı</title>
+<style>
+  body { font-family: -apple-system, "Segoe UI", system-ui, sans-serif; font-size: 15px; line-height: 1.6; color: #1f2328; background: #ffffff; margin: 0; }
+  main { max-width: 760px; margin: 0 auto; padding: 32px 20px; }
+  h1 { font-size: 24px; margin: 0 0 4px; }
+  h2 { font-size: 18px; margin: 32px 0 8px; padding-bottom: 4px; border-bottom: 1px solid #e5e7eb; }
+  h3 { font-size: 15px; margin: 20px 0 6px; }
+  p.meta { color: #57606a; margin: 0 0 16px; }
+  code { background: #f7f8fa; border: 1px solid #e5e7eb; border-radius: 3px; padding: 0 4px; font-size: 13px; }
+  table { border-collapse: collapse; width: 100%; margin: 8px 0; }
+  th, td { border: 1px solid #e5e7eb; padding: 6px 10px; text-align: left; vertical-align: top; }
+  th { background: #f7f8fa; }
+  .note { background: #f7f8fa; border-left: 3px solid #3b82d4; padding: 8px 12px; margin: 12px 0; }
+  ul, ol { padding-left: 22px; }
+  footer { margin-top: 40px; padding-top: 12px; border-top: 1px solid #e5e7eb; text-align: center; font-size: 12px; color: #57606a; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Limits &amp; Statements Servisi - Uygulama Planı</h1>
+  <p class="meta">Kaynaklar: <code>docs/PRD-limits.md</code>, <code>docs/API-SPEC-limits.yaml</code>, <code>docs/ENGINEERING-HANDBOOK.md</code>, <code>verify/test_m1_limits.py</code> (35 kontrol) | Durum: onay bekliyor</p>
+
+  <h2>1. Kapsam ve kısıtlar</h2>
+  <ul>
+    <li>Yeni dosyalar: <code>services/limits/__init__.py</code> ve <code>services/limits/main.py</code> (<code>app</code> adlı FastAPI uygulaması).</li>
+    <li><code>services/core</code>'a ve <code>verify/</code> testlerine dokunulmaz. Yeni bağımlılık eklenmez.</li>
+    <li>Depolama bellek içidir (Python <code>dict</code>/<code>list</code>). Para tutarları yalnızca <code>Decimal</code> ile tutulur.</li>
+  </ul>
+
+  <h2>2. Tasarım</h2>
+
+  <h3>Veri modeli</h3>
+  <table>
+    <tr><th>Yapı</th><th>Anlamı</th></tr>
+    <tr><td><code>limits: dict[customer_id, (daily, per_transfer)]</code></td><td>Tanımlı limitler. Kayıt yoksa varsayılanlar (10000.00 / 5000.00).</td></tr>
+    <tr><td><code>usage: dict[(customer_id, date), Decimal]</code></td><td>O günün onaylanmış toplamı.</td></tr>
+    <tr><td><code>entries: dict[customer_id, list]</code></td><td>Onaylanan işlemler, onay sırasıyla eklenir.</td></tr>
+  </table>
+  <p>Karar ve yazma işlemi tek bir <code>threading.Lock</code> altında yapılır. Böylece eşzamanlı isteklerde kullanım aşılmaz.</p>
+
+  <h3>Doğrulama</h3>
+  <ul>
+    <li><code>customer_id</code>: <code>^C[0-9]{6}$</code>. Path parametresi elle doğrulanır, hata zarfı garanti olur.</li>
+    <li>Tutar: string olmalı, <code>^[0-9]+(\.[0-9]{1,2})?$</code> ile eşleşmeli ve <code>&gt; 0</code> olmalı. <code>abc</code>, boş değer, <code>10.999</code>, <code>-1</code>, <code>1e3</code>, <code>NaN</code> ve JSON sayısı reddedilir.</li>
+    <li><code>PUT /limits</code>: <code>per_transfer_limit &lt;= daily_limit</code>.</li>
+    <li>Tarih: <code>date.fromisoformat</code> ve katı <code>YYYY-MM-DD</code>. <code>2025-13-45</code> reddedilir.</li>
+    <li>Statement: <code>from</code> ve <code>to</code> zorunlu, <code>from &gt; to</code> geçersiz.</li>
+    <li>Çıktı: <code>quantize(Decimal("0.01"), ROUND_HALF_UP)</code> ile her zaman tam 2 ondalık (<code>"2000.50"</code>, <code>"0.00"</code>).</li>
+  </ul>
+
+  <h3>Hata zarfı</h3>
+  <p><code>{"error": {"code": "...", "message": "..."}}</code></p>
+  <ul>
+    <li><code>RequestValidationError</code> handler'ı: HTTP 422, <code>VALIDATION_ERROR</code>, <code>detail</code> alanı yok. Mesaj okunabilir ve sabittir, ham pydantic çıktısı sızdırılmaz. Eksik alan ve bozuk JSON da buradan geçer.</li>
+    <li>Beklenmeyen <code>Exception</code>: HTTP 500, <code>INTERNAL_ERROR</code>, sabit mesaj "Beklenmeyen bir hata oluştu". Ayrıntı yalnızca sunucuda <code>logging</code> ile yazılır.</li>
+  </ul>
+
+  <h3>Uç noktalar</h3>
+  <table>
+    <tr><th>Uç nokta</th><th>Davranış</th></tr>
+    <tr><td><code>PUT /limits/{id}</code></td><td>Doğrula, kaydet, <code>source=custom</code> ile 200 döner. Mevcut kullanıma dokunmaz (kural 8).</td></tr>
+    <tr><td><code>GET /limits/{id}</code></td><td>Tanımlı değilse <code>10000.00 / 5000.00</code> ve <code>source=default</code>.</td></tr>
+    <tr><td><code>POST /limits/{id}/authorize</code></td><td>Önce <code>amount &gt; per_transfer</code> kontrolü (<code>PER_TRANSFER_LIMIT_EXCEEDED</code>, öncelikli). Sonra <code>usage + amount &gt; daily</code> kontrolü (<code>DAILY_LIMIT_EXCEEDED</code>). Eşitlik onaylanır (kural 3). Onaylanırsa kullanıma ve statement'a yazılır, reddedilirse hiçbir yere yazılmaz. İkisi de HTTP 200.</td></tr>
+    <tr><td><code>GET /statements/{id}?from&amp;to</code></td><td>Uçlar dahil süzülür, <code>occurred_on</code>'a göre artan sıralanır, aynı günde onay sırası korunur (kararlı sıralama). <code>total</code> toplamdır. Kayıt yoksa <code>entries: []</code> ve <code>"0.00"</code>.</td></tr>
+  </table>
+
+  <h3>Loglama</h3>
+  <p><code>logging</code> kullanılır, <code>print</code> kullanılmaz. Yalnızca <code>customer_id</code> loglanır. Tutar ve açıklama loglanmaz, çünkü açıklama serbest metindir ve PII içerebilir.</p>
+
+  <h2>3. PRD kural izlenebilirliği</h2>
+  <table>
+    <tr><th>PRD kuralı</th><th>Karşılığı</th></tr>
+    <tr><td>1 - Varsayılan limitler</td><td><code>GET</code> ve <code>authorize</code> kayıt yoksa 10000.00 / 5000.00 kullanır.</td></tr>
+    <tr><td>2 - Limit tanımı doğrulaması</td><td>İki değer <code>&gt; 0</code>, <code>per &lt;= daily</code>.</td></tr>
+    <tr><td>3 - Limitler dahil</td><td>Karşılaştırmalar <code>&gt;</code> ile reddeder, <code>&lt;=</code> onaylar.</td></tr>
+    <tr><td>4 - Onay koşulları</td><td>İki koşul birlikte kontrol edilir.</td></tr>
+    <tr><td>5 - Sebep önceliği</td><td>Per-transfer kontrolü önce çalışır.</td></tr>
+    <tr><td>6 - Yalnız onaylanan yazılır</td><td>Yazma yalnızca onay dalında yapılır.</td></tr>
+    <tr><td>7 - Günler bağımsız</td><td>Kullanım anahtarı <code>(customer_id, occurred_on)</code>.</td></tr>
+    <tr><td>8 - Limit değişikliği</td><td><code>PUT</code> yalnızca limit kaydını günceller.</td></tr>
+    <tr><td>9 - Statement sırası</td><td>Tarihe göre kararlı sıralama, uçlar dahil.</td></tr>
+    <tr><td>10 - <code>from &gt; to</code></td><td>422. Boş statement 200.</td></tr>
+  </table>
+
+  <h2>4. Karar noktaları (onayınız gerekiyor)</h2>
+  <ol>
+    <li><strong><code>remaining_daily</code> negatif olursa:</strong> Limit düşürülürse (kural 8) kullanım yeni limiti aşabilir. <code>Money</code> şeması negatifi desteklemediği için <code>0.00</code> olarak kırpılması önerilir.</li>
+    <li><strong><code>description</code> uzunluğu:</strong> Spec sınır vermiyor. Bellek şişmesini önlemek için üst sınır (ör. 255 karakter) önerilir. Aşılırsa 422.</li>
+    <li><strong>Bilinmeyen rota (404) ve yanlış metot (405):</strong> El kitabı tüm hataların zarfla dönmesini ister. Bunları <code>NOT_FOUND</code> ve <code>METHOD_NOT_ALLOWED</code> kodlarıyla zarfa almak önerilir. Bu kodlar spec'te yok, ama <code>{"detail": ...}</code> sızmasını engeller.</li>
+    <li><strong>Ek testler:</strong> El kitabı her özellik için mutlu yol, negatif durum ve sınır testi ister. <code>verify/</code> testleri çoğunu kapsıyor. PRD §7 senaryosunu uçtan uca doğrulayan küçük bir <code>tests/test_limits.py</code> eklenmesi önerilir.</li>
+  </ol>
+  <div class="note">Tercih belirtmezseniz yukarıdaki öneriler uygulanır.</div>
+
+  <h2>5. Adımlar</h2>
+  <ol>
+    <li><code>services/limits/__init__.py</code> ve <code>main.py</code> yazılır (modeller, doğrulama, durum, handler'lar, 3 uç nokta).</li>
+    <li><code>./verify/run.sh m1</code> çalıştırılır. Hedef: 35 kontrolün tamamı PASS.</li>
+    <li>PRD §7 senaryosu için <code>tests/test_limits.py</code> yazılır ve <code>pytest</code> çalıştırılır.</li>
+    <li><code>./scripts/scan.sh</code> ile güvenlik taraması 0 bulgu vermeli. <code>git status</code> ile <code>services/core</code>'un değişmediği doğrulanır.</li>
+    <li>Çalıştırma: <code>uvicorn services.limits.main:app --host 127.0.0.1</code>.</li>
+  </ol>
+
+  <h2>6. Teslimat</h2>
+  <p>Dal: <code>feature/limits-service</code>. Commit mesajı İngilizce tek cümle. PR yalnızca istenirse <code>gh pr create</code> ile ve şablon doldurularak açılır.</p>
+
+  <footer>Made with IBM Bob</footer>
+</main>
+</body>
+</html>
